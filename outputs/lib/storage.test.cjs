@@ -1,0 +1,12 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const ts=require('typescript');
+const fs=require('node:fs');
+const vm=require('node:vm');
+function load(file){const source=fs.readFileSync(require('node:path').join(__dirname,file),'utf8');const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const mod={exports:{}};vm.runInThisContext('(function(require,module,exports){'+code+'\n})')((name)=>name==='./core'?load('core.ts'):require(name),mod,mod.exports);return mod.exports}
+const storage=load('storage.ts');const {fresh}=load('core.ts');
+test('unavailable localStorage falls back without overwriting',()=>{global.localStorage={getItem(){throw Error('Denied')},setItem(){throw Error('Denied')}};assert.ok(storage.readState().error);assert.equal(storage.saveState(fresh()),false)});
+test('malformed or invalid saved state is rejected',()=>{for(const value of ['{broken',JSON.stringify({version:1,submissions:[],completed:{},current:88})]){global.localStorage={getItem:()=>value};assert.ok(storage.readState().error)}});
+test('saved state roundtrip preserves draft and journal',()=>{let value;global.localStorage={getItem:()=>value,setItem:(k,v)=>value=v};const state=fresh();state.drafts[1]={answers:{aim:'A clear read'},scores:{Hierarchy:5},images:[]};state.journal.push({id:'qa',date:new Date().toISOString(),prompt:'Learned',text:'Less noise'});assert.equal(storage.saveState(state),true);assert.deepEqual(storage.readState().state,state)});
+test('invalid format, too many images and oversized files fail before storage',async()=>{await assert.rejects(storage.putImages([]),/Choose/);await assert.rejects(storage.putImages(Array(13).fill({})),/12/);await assert.rejects(storage.putImages([new File(['bad'],'bad.txt',{type:'text/plain'})]),/PNG/);await assert.rejects(storage.putImages([{type:'image/png',size:16*1024*1024}]),/15 MB/)});
+test('empty backup contains all state and invalid restores reject',async()=>{const state=fresh();const parsed=JSON.parse(await storage.backup(state));assert.equal(parsed.format,'design-reset-backup');assert.deepEqual(parsed.state,state);assert.deepEqual(parsed.images,{});await assert.rejects(storage.restore('{}'),/valid DESIGN RESET/)});
