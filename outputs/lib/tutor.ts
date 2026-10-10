@@ -1,0 +1,22 @@
+import type {Skill} from './curriculum';
+export type Finding={asset:number;location:string;observation:string;why:string;action:string;test:string;skill:Skill};
+export type TutorCritique={verdict:'ready'|'revise'|'not_assessable';summary:string;strengths:{asset:number;evidence:string;reason:string}[];priorities:Finding[];scores:{skill:Skill;score:number|null;evidence:string}[];lesson:{title:string;explanation:string;check:string};comparison:string;limitations:string[]};
+export type TutorExchange={question:string;answer:string;nextAction:string};
+export type TutorRecord={id:string;session:number;date:string;images:string[];context:string;critique:TutorCritique;model:string;parentId?:string;conversation:TutorExchange[]};
+export const STAGES=['Understand','Design','Review','Refine'] as const;
+export type FocusSession={phase:number;elapsed:number;started:number|null;finished:number[];expired:boolean;reviewId?:string;revisionId?:string;accepted?:boolean};
+export const newFocus=():FocusSession=>({phase:0,elapsed:0,started:null,finished:[],expired:false});
+export function stageSeconds(phase:number,missionMinutes:number){return [15*60,Math.max(30,missionMinutes-25)*60,10*60,20*60][phase]??0}
+export function spent(s:FocusSession,now=Date.now()){return s.elapsed+(s.started===null?0:Math.max(0,Math.floor((now-s.started)/1000)))}
+export function remaining(s:FocusSession,minutes:number,now=Date.now()){return Math.max(0,stageSeconds(s.phase,minutes)-spent(s,now))}
+export function expire(s:FocusSession,minutes:number,now=Date.now()):FocusSession{if(s.started===null||remaining(s,minutes,now)>0)return s;return {...s,elapsed:stageSeconds(s.phase,minutes),started:null,expired:true}}
+export function advance(s:FocusSession,minutes:number,now=Date.now(),finishEarly=false):FocusSession{if(s.phase>=3||s.finished.includes(s.phase))throw Error('This stage is already locked.');if(!finishEarly&&remaining(s,minutes,now)>0)throw Error('Finish the current countdown first.');if(s.phase===2&&!s.reviewId)throw Error('Get a tutor review before continuing.');return {...s,finished:[...s.finished,s.phase],phase:s.phase+1,elapsed:0,started:null,expired:false}}
+export function scoreHistory(records:TutorRecord[]){const latest=new Map<string,TutorRecord>();for(const r of records)if(r.critique.verdict!=='not_assessable')latest.set(String(r.session),r);const values=new Map<Skill,number[]>();for(const r of latest.values())for(const s of r.critique.scores)if(s.score!==null)values.set(s.skill,[...(values.get(s.skill)||[]),s.score]);return [...values].map(([skill,scores])=>({skill,count:scores.length,average:scores.slice(-5).reduce((a,b)=>a+b,0)/Math.min(5,scores.length),delta:scores.length>1?scores.at(-1)!-scores[0]:0})).sort((a,b)=>a.average-b.average)}
+export function validateCritique(value:unknown,categories:readonly string[],imageCount:number):TutorCritique{
+ if(!value||typeof value!=='object')throw Error('The tutor returned an unreadable review. Please retry.');
+ const v=value as TutorCritique;const text=(s:unknown,max=2500)=>typeof s==='string'&&s.trim().length>0&&s.length<=max;const asset=(n:unknown)=>Number.isInteger(n)&&Number(n)>=1&&Number(n)<=imageCount;
+ if(!['ready','revise','not_assessable'].includes(v.verdict)||!text(v.summary)||!Array.isArray(v.strengths)||v.strengths.length>4||!v.strengths.every(s=>asset(s.asset)&&text(s.evidence)&&text(s.reason))||!Array.isArray(v.priorities)||v.priorities.length>3||!v.priorities.every(p=>asset(p.asset)&&categories.includes(p.skill)&&[p.location,p.observation,p.why,p.action,p.test].every(t=>text(t)))||!Array.isArray(v.scores)||v.scores.length!==categories.length||new Set(v.scores.map(s=>s.skill)).size!==categories.length||!v.scores.every(s=>categories.includes(s.skill)&&(s.score===null||(Number.isFinite(s.score)&&s.score>=1&&s.score<=10))&&text(s.evidence))||!v.lesson||![v.lesson.title,v.lesson.explanation,v.lesson.check].every(t=>text(t))||typeof v.comparison!=='string'||v.comparison.length>2500||!Array.isArray(v.limitations)||v.limitations.length>5||!v.limitations.every(s=>text(s)))throw Error('The tutor returned an incomplete review. Your work is safe; please retry.');
+ if(v.verdict==='not_assessable'&&v.scores.some(s=>s.score!==null))throw Error('The tutor could not assess this image reliably. Please retry with a clearer export.');
+ if(v.verdict==='revise'&&!v.priorities.length)throw Error('The tutor did not provide a revision plan. Please retry.');
+ return v;
+}
