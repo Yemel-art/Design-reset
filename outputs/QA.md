@@ -1,51 +1,52 @@
-# QA record
+# Live Gemini connection verified — 10 October 2026
 
-Verified on 3 October 2026.
+- Reused the existing API key from a Google AI Studio project visibly labelled Free Tier. Billing was not enabled. The key is stored only in ignored `.env.local` and is excluded from source archives.
+- Live testing exposed an incompatible response-format field; changed to `responseMimeType` plus `responseJsonSchema`.
+- Google rejected Gemini 2.5 Flash as unavailable to new users. Updated the fixed model to Gemini 3.8 Flash after verifying its free-tier listing, with LOW thinking level.
+- The app's actual `/api/tutor` endpoint returned HTTP 200 and a validated `not_assessable` review. It correctly identified the test image's “QA TEST IMAGE” label, lime background and black line, and explained that the LUMA brief's assets were missing.
+- This confirms live image transmission and response validation. It does not establish critique quality across real design projects or live revision comparisons.
 
-## Automated checks
+## Historical migration checks — 7 October 2026
 
-`npm test`: 13 passing tests covering:
+Supersedes the OpenAI integration described in the historical checks below.
 
-- 20 unique main sessions across the complete 30-day calendar.
-- Streak deduplication, gaps, month boundaries and yesterday grace.
-- Timer reconstruction from persisted timestamps and paused elapsed time.
-- Skill averages, recent-five window, baseline and change calculations.
-- Recurring low-score recommendations and honest evidence wording.
-- Unavailable localStorage, malformed saved JSON and invalid saved state.
-- Draft and journal storage roundtrip.
-- Invalid upload formats, empty uploads, image count and size limits.
-- Backup structure and rejection of invalid restore data.
+- 26 automated tests pass. Provider tests inject Gemini-format responses and verify current/previous image bytes, structured JSON, follow-up answers, blocked/truncated/malformed output, quota handling with exactly one request, and rejection of unsupported models before transmission.
+- No OpenAI endpoint remains in the active app. Model fixed to gemini-2.5-flash; no automatic fallback or retries.
+- Free usage requires a Google project with billing disabled. The application cannot inspect or guarantee the billing tier of a supplied API key.
+- Live model quality and account eligibility remain unverified until a real free-tier Gemini key is configured.
+- Production build passed, including type checks and dynamic API route generation.
+- Local configuration GET returned Gemini 2.5 Flash with configured=false. A missing-key review returned 503 with free-tier setup instructions.
+- Browser Settings shows Gemini setup, the Google AI Studio key link, instructions to keep billing disabled, quota behavior and free-tier privacy disclosure. Existing stage progress remained visible.
 
-`npm run build`: optimized Next.js production build and static export passed.
+---
 
-## Browser checks
+# DESIGN RESET tutor update — QA
 
-Tests used a separate `127.0.0.1` origin so test work does not appear in the user's `localhost` workspace.
+Verified 7 October 2026. This supersedes the original self-assessment release.
 
-- Desktop dashboard visual inspection at 1440 × 1000.
-- Mobile light-theme visual inspection at 390 × 844; no document overflow.
-- Navigation through mission, progress, journal, practice, references, drawing, case study and settings.
-- Timer start, pause, resume, phase transitions and completion prompt.
-- PNG upload to IndexedDB and rendered draft preview.
-- Reload retained the 13-second paused timer, draft critique and uploaded image.
-- Incomplete self-critique blocked submission with an actionable error.
-- Full submission saved, displayed its image and produced all five review sections.
-- Next-mission navigation advanced session 1 to session 2.
-- Progress displayed 1/20 main sessions, 1/30 days, one-day streak and the expected 8.0 composition, 5.0 hierarchy and 7.0 execution scores.
-- Hierarchy was correctly recommended as the next practice focus.
-- Journal entry saved; reference image and all seven study notes saved.
-- Drawing completion and case-study editing/export exercised.
-- Full image-inclusive backup exported; a valid test backup restored through the confirmation flow.
-- Final session 20 submission populated the case-study project, objective, self-critique and mentor feedback.
-- Before/after comparison appeared after two submissions.
-- Read-only WebMCP progress tool returned matching data and rejected unexpected input.
+## Automated verification
 
-## Practical limits
+- `npm test`: 24 passing tests. Coverage includes curriculum integrity, existing-data migration, malformed saved tutor data, countdown expiry and stage locks, review gating, revision-based skill trends, image request validation, access-code checks, and provider error/refusal handling.
+- `npm run build`: passed production compilation, type checks and route generation. `/api/tutor` is a dynamic server endpoint; this release is not a static export.
+- Provider tests use injected mock responses. They confirm actual image payload construction, structured response handling and `store: false`; they do not demonstrate model critique quality.
+- Local API configuration GET returned 200 with `configured: false`. POST without a server key returned 503 with setup instructions.
 
-- Mentor reviews are deterministic coaching from self-assessment; they do not analyze image pixels or independently grade designs.
-- Browser-local data is not synchronized across devices or domains. Backups include images.
-- Physical disk exhaustion/browser eviction was not induced; denial and validation paths are covered by tests.
-- No Vercel account deployment was performed. The source and static build are ready for deployment.
-- PDF generation is not included. Case studies export as editable Markdown; full backups export as JSON.
+## Browser verification
 
-Additional checks: supporting-day completion passed; a corrupt PNG was rejected without creating a submission; tablet viewport at 820 px had no document overflow.
+- Desktop studio inspected at 1440 × 1000; mobile inspected at 390 × 844 with no horizontal overflow.
+- Four navigation destinations: Studio, Roadmap, Your work, Settings.
+- Restored a boundary timer fixture with one second remaining. Resume reached 00:00, stopped, showed the time-complete alert and enabled stage completion.
+- Completing Understand locked it and opened Design. Reload retained the lock.
+- Finishing Design early displayed a confirmation; confirming locked Design and opened Review.
+- PNG upload saved in IndexedDB and appeared in Review without mandatory self-ratings.
+- Review and advancement controls stayed disabled when prerequisites were missing.
+- Restored a clearly labelled saved-review fixture with an image. Evidence, prioritized edits, verification tests, lesson and follow-up form rendered correctly. Pip used its recommended edit.
+- Restore uses an in-page confirmation dialog.
+- Backup export was invoked without a page error, but the automation download event timed out; downloaded-file verification remains incomplete. Backup structure has automated coverage.
+
+## Remaining external verification
+
+- No OpenAI API key is configured. Real image critique, follow-up quality and live revision comparison remain unverified. No fake critique is supplied when configuration is missing.
+- The completion status was verified visually; audible playback was not independently confirmed. Sound requires the app open and an unlocked audio context.
+- GitHub publishing and Vercel hosting remain pending account connection. No public deployment was made.
+- This is a personal studio. Commercial multiuser release still needs accounts, isolated cloud storage, durable quotas and billing.
